@@ -34,8 +34,8 @@ those same samples the entire time — zero data gap.
           ┌─────────────┘       └──────────────┐
           ▼                                    ▼
 ┌──────────────────┐              ┌──────────────────┐
-│ Primary Cluster  │◄─mergeDuring─┤ Secondary Cluster │
-│ (N nodes)        │  Retrieval   │ (M nodes)         │
+│ Primary Cluster  │◄── queries ──┤ Secondary Cluster │
+│ (N nodes)        │  for merge   │ (M nodes)         │
 │ STS → MTS → LTS  │              │ STS → MTS → ∅     │
 │ (permanent store)│              │ (safety net only)  │
 └──────────────────┘              └──────────────────┘
@@ -64,9 +64,20 @@ Instead:
   with `hold=30, gather=1`) is discarded. The secondary is a safety net, not a
   second permanent archive.
 
-For retrieval, the secondary has `mergeDuringRetrieval` configured to proxy the
-primary. So queries to the secondary still return full historical data — the
-secondary serves its own recent STS/MTS data merged with the primary's LTS.
+For retrieval, the secondary is configured with `mergeDuringRetrieval` pointing
+at the primary. This is a feature already built into the archiver appliance. In
+plain terms: when a client queries the secondary for data (e.g., "give me PV X
+from January to March"), the secondary doesn't just look in its own storage. It
+also makes the same request to the primary behind the scenes, gets both sets of
+data, merges them together, and returns the combined result. This merge is
+read-only — it does not change any stored data on either cluster. If the primary
+is unreachable, the secondary just returns whatever it has locally and degrades
+gracefully.
+
+The net effect: a client querying the secondary sees the **same complete
+dataset** as if they queried the primary, even though the secondary only stores
+~29 days of data locally. The primary's LTS fills in all the historical data
+transparently.
 
 ### Example secondary `policies.py` dataStores
 
@@ -224,8 +235,12 @@ externalarchiverserverurl=http://primary-retrieval:17668/retrieval/bpl?mergeDuri
 archives=pbraw"
 ```
 
-This configures `mergeDuringRetrieval` so the secondary proxies the primary's
-LTS for historical queries.
+These two curl commands tell the secondary cluster: "the primary cluster also
+has archived data — whenever someone asks you for data, also ask the primary for
+the same data and merge the results together before responding." This is the
+`mergeDuringRetrieval` feature built into the archiver appliance. It is
+read-only and does not modify stored data on either side. If the primary is
+unreachable at query time, the secondary simply returns its own local data.
 
 ## Running the Orchestrator
 
@@ -258,7 +273,7 @@ python main.py -c config.yaml -v
 | Scenario | Behavior |
 |----------|----------|
 | Secondary down during sync | Orchestrator retries next interval; primary unaffected |
-| Both clusters healthy, network partitioned from each other | Both archive independently; secondary's mergeDuringRetrieval gracefully degrades; data reconciled when partition heals |
+| Both clusters healthy, network partitioned from each other | Both archive independently; secondary's retrieval merge with the primary gracefully degrades (returns local data only); data reconciled when partition heals |
 | Orchestrator crashes | Both clusters continue archiving independently; PV sync pauses; deploy with systemd/k8s for auto-restart |
 | PV added to primary during secondary outage | Synced on next successful interval after secondary recovers |
 | Duplicate archivePV call on secondary | Returns "Already submitted" — not an error |
