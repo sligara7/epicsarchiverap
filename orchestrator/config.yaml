@@ -1,0 +1,61 @@
+orchestrator:
+  sync_interval: 300          # seconds between PV syncs
+  health_check_interval: 30   # seconds between health checks
+  archive_batch_size: 100     # PVs per archivePV batch
+  batch_delay: 5              # seconds between batches
+  api_port: 9090
+  state_file: /var/lib/archiver-orchestrator/state.json
+
+primary_cluster:
+  name: "primary"
+  mgmt_url: "http://primary-mgmt:17665/mgmt/bpl"
+  data_retrieval_url: "http://primary-retrieval:17668/retrieval"
+
+secondary_cluster:
+  name: "secondary"
+  mgmt_url: "http://secondary-mgmt:17665/mgmt/bpl"
+  data_retrieval_url: "http://secondary-retrieval:17668/retrieval"
+
+failover:
+  strategy: "dns"               # "dns" or "proxy"
+  dns_record: "archiver-data.facility.org"
+  auto_failover: false          # require operator confirmation
+  auto_failover_delay: 120      # seconds before auto-failover
+  auto_failback: false          # require operator confirmation for failback
+
+reconciliation:
+  auto_reconcile: false
+  max_concurrent_merges: 1
+  # The store ON THE PRIMARY to merge gap data into. With the recommended
+  # blackhole-LTS strategy on the secondary, the secondary only retains
+  # STS+MTS data. The merge pulls that data and writes it into the primary's
+  # LTS. The secondary's MTS 'hold' parameter determines the maximum
+  # reconciliation window — reconcile before the secondary ETLs data to
+  # the blackhole, or the gap data is lost.
+  merge_target_store: "LTS"
+  # Must match the secondary's MTS effective retention (hold - gather days).
+  # Used to alert operators when unreconciled outages approach the deadline.
+  secondary_retention_days: 29
+
+alerting:
+  webhook_url: ""               # e.g. https://hooks.slack.com/services/...
+
+# ============================================================================
+# SECONDARY CLUSTER STORAGE STRATEGY
+# ============================================================================
+# The secondary cluster should use a policies.py with BlackholeStoragePlugin
+# as LTS, so it only keeps short/medium-term data (no duplicated long-term
+# storage). Example secondary policies.py dataStores:
+#
+#   STS: pb://localhost?name=STS&rootFolder=${ARCHAPPL_SHORT_TERM_FOLDER}&partitionGranularity=PARTITION_HOUR&consolidateOnShutdown=true
+#   MTS: pb://localhost?name=MTS&rootFolder=${ARCHAPPL_MEDIUM_TERM_FOLDER}&partitionGranularity=PARTITION_DAY&hold=30&gather=1
+#   LTS: blackhole://localhost?name=LTS
+#
+# With hold=30 on daily partitions, the secondary keeps ~29 days of data in
+# MTS before discarding it. This gives a 29-day window to reconcile any
+# primary outage. Adjust 'hold' based on your maximum acceptable outage
+# duration + reconciliation time.
+#
+# The secondary's mergeDuringRetrieval proxy to the primary means queries
+# to the secondary still return full historical data from the primary's LTS.
+# ============================================================================

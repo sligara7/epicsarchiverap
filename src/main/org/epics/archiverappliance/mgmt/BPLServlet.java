@@ -28,8 +28,11 @@ import org.epics.archiverappliance.mgmt.bpl.ChangeTypeForPV;
 import org.epics.archiverappliance.mgmt.bpl.ChannelArchiverListView;
 import org.epics.archiverappliance.mgmt.bpl.ConsolidatePBFilesForOnePV;
 import org.epics.archiverappliance.mgmt.bpl.DeletePV;
+import org.epics.archiverappliance.mgmt.bpl.ExportArchivalConfig;
+import org.epics.archiverappliance.mgmt.bpl.ExportArchivalConfigForThisInstance;
 import org.epics.archiverappliance.mgmt.bpl.ExportConfig;
 import org.epics.archiverappliance.mgmt.bpl.ExportConfigForThisInstance;
+import org.epics.archiverappliance.mgmt.bpl.GetClusterHealthSummary;
 import org.epics.archiverappliance.mgmt.bpl.GetAllAliasesAction;
 import org.epics.archiverappliance.mgmt.bpl.GetAllExpandedPVNames;
 import org.epics.archiverappliance.mgmt.bpl.GetAllPVs;
@@ -140,6 +143,7 @@ public class BPLServlet extends HttpServlet {
         addAction("/getPVDetails", PVDetails.class);
         addAction("/getApplianceInfo", GetApplianceInfo.class);
         addAction("/getAppliancesInCluster", GetAppliancesInCluster.class);
+        addAction("/getClusterHealthSummary", GetClusterHealthSummary.class);
         addAction("/renamePV", RenamePVAction.class);
         addAction("/reshardPV", ReshardPV.class);
         addAction("/reassignAppliance", ReassignAppliance.class);
@@ -188,6 +192,8 @@ public class BPLServlet extends HttpServlet {
         addAction("/getPolicyText", GetPolicyText.class);
         addAction("/exportConfig", ExportConfig.class);
         addAction("/exportConfigForAppliance", ExportConfigForThisInstance.class);
+        addAction("/exportArchivalConfig", ExportArchivalConfig.class);
+        addAction("/exportArchivalConfigForAppliance", ExportArchivalConfigForThisInstance.class);
         addAction("/getInstanceMetrics", InstanceReport.class);
         addAction("/getInstanceMetricsForAppliance", InstanceReportDetails.class);
         addAction("/getApplianceMetrics", ApplianceMetrics.class);
